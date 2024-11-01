@@ -1,0 +1,15 @@
+[package]
+name = "sdb-pipeline"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+num_cpus = "1.16.0"
+tokio = { version = "1.41.0", features = ["rt-multi-thread", "sync", "time", "macros"] }
+rayon = "1.10.0"
+futures = "0.3.31"
+
+[[bench]]
+name = "bench"
+harness = false
