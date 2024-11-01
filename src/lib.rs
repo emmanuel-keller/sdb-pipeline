@@ -62,9 +62,14 @@ pub async fn tokio_tasks(max_concurrent: usize, count: usize) {
 
 #[cfg(test)]
 mod test {
-    use crate::{future_unordered, future_unordered_pooled, rayon, tokio_tasks};
+    use crate::{do_something, future_unordered, future_unordered_pooled, rayon, tokio_tasks};
 
     const COUNT: usize = 100_000_000;
+
+    #[test]
+    fn test_do_something() {
+        do_something(1);
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_future_unordered() {
