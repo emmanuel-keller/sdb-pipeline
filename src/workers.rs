@@ -10,7 +10,7 @@ pub(super) struct Workers {
 impl Workers {
     pub(super) fn with_capacity<F>(max_concurrent: usize, func: F) -> Self
     where
-        F: Fn(usize) + 'static + Send + Sync + Copy,
+        F: Fn(usize, u32, u64) + 'static + Send + Sync + Copy,
     {
         let mut workers = Vec::with_capacity(max_concurrent);
         let mut handles = Vec::with_capacity(max_concurrent);
@@ -26,8 +26,8 @@ impl Workers {
         }
     }
 
-    pub(super) async fn send(&mut self, value: usize) {
-        self.workers[self.next].send(value).await;
+    pub(super) async fn send(&mut self, value: usize, n: u32, expect: u64) {
+        self.workers[self.next].send(value, n, expect).await;
         self.next = (self.next + 1) % self.workers.len();
     }
 
@@ -41,23 +41,23 @@ impl Workers {
     }
 }
 
-pub(super) struct Worker(Sender<usize>);
+pub(super) struct Worker(Sender<(usize, u32, u64)>);
 
 impl Worker {
     fn new<F>(func: F) -> (Self, JoinHandle<()>)
     where
-        F: Fn(usize) + 'static + Send + Sync,
+        F: Fn(usize, u32, u64) + 'static + Send + Sync,
     {
         let (tx, rx) = channel(10000);
         let handle = tokio::task::spawn(async move {
-            while let Some(value) = rx.recv().await {
-                func(value);
+            while let Some((value, n, expect)) = rx.recv().await {
+                func(value, n, expect);
             }
         });
         (Self(tx), handle)
     }
 
-    async fn send(&self, value: usize) {
-        self.0.send(value).await.unwrap()
+    async fn send(&self, value: usize, n: u32, expect: u64) {
+        self.0.send((value, n, expect)).await.unwrap()
     }
 }
