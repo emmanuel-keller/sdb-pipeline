@@ -1,10 +1,13 @@
 #[cfg(test)]
 mod test;
-mod workers;
+mod tokio_tasks;
 
-use crate::workers::Workers;
+use crate::tokio_tasks::TokioWorkers;
 use criterion::black_box;
+use futures::stream;
 use futures::stream::{FuturesUnordered, StreamExt};
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 use rayon::scope;
 
 fn fibonacci(n: u32) -> u64 {
@@ -44,7 +47,13 @@ pub async fn future_unordered_pooled(max_concurrent: usize, mut count: usize, n:
     while let Some(()) = tasks.next().await {}
 }
 
-pub fn rayon(count: usize, n: u32, expect: u64) {
+pub fn rayon_par_iter(count: usize, n: u32, expect: u64) {
+    (0..count)
+        .into_par_iter()
+        .for_each(|v| do_something(v, n, expect));
+}
+
+pub fn rayon_scope(count: usize, n: u32, expect: u64) {
     scope(|s| {
         for i in 0..count {
             s.spawn(move |_| {
@@ -54,10 +63,35 @@ pub fn rayon(count: usize, n: u32, expect: u64) {
     });
 }
 
-pub async fn tokio_tasks(max_concurrent: usize, count: usize, n: u32, expect: u64) {
-    let mut workers = Workers::with_capacity(max_concurrent, do_something);
+pub async fn tokio_tasks(
+    max_concurrent: usize,
+    queue_size: usize,
+    count: usize,
+    n: u32,
+    expect: u64,
+) {
+    let mut workers = TokioWorkers::with_capacity(max_concurrent, queue_size, |(v, n, e)| {
+        do_something(v, n, e)
+    });
     for i in 0..count {
-        workers.send(i, n, expect).await;
+        workers.send((i, n, expect)).await;
     }
     workers.join().await;
+}
+
+pub async fn buffer_unordered(max_concurrent: usize, count: usize, n: u32, expect: u64) {
+    let task_stream = stream::iter(0..count).map(|item| async move {
+        do_something(item, n, expect);
+    });
+    let r = task_stream.buffer_unordered(max_concurrent).count().await;
+    assert_eq!(r, count);
+}
+
+pub async fn for_each_concurrent(max_concurrent: usize, count: usize, n: u32, expect: u64) {
+    let task_stream = stream::iter(0..count);
+    task_stream
+        .for_each_concurrent(max_concurrent, |item| async move {
+            do_something(item, n, expect);
+        })
+        .await;
 }

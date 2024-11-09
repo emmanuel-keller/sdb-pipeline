@@ -10,6 +10,8 @@ tokio = { version = "1.41.1", features = ["rt-multi-thread", "macros"] }
 rayon = "1.10.0"
 futures = "0.3.31"
 thingbuf = "0.1.6"
+executor = { version = "1.8.0", package = "async-executor" }
+channel = { version = "2.3.1", package = "async-channel" }
 
 [[bench]]
 name = "bench"

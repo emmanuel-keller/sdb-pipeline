@@ -1,5 +1,6 @@
 use crate::{
-    do_something, fibonacci, future_unordered, future_unordered_pooled, rayon, tokio_tasks,
+    buffer_unordered, do_something, fibonacci, for_each_concurrent, future_unordered,
+    future_unordered_pooled, rayon_par_iter, rayon_scope, tokio_tasks,
 };
 use std::time::{Duration, Instant};
 
@@ -48,17 +49,31 @@ async fn test_future_unordered_pooled() {
 }
 
 #[test]
-fn test_rayon_is_parallel() {
+fn test_rayon_scope_is_parallel() {
     let cpus = num_cpus::get();
     let fib_time = calibrate_fibonacci(FIBONACCI_N_PAR);
     let time = Instant::now();
-    rayon(cpus, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR);
+    rayon_scope(cpus, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR);
     assert!(time.elapsed() < fib_time * 2);
 }
 
 #[test]
-fn test_rayon() {
-    rayon(COUNT, FIBONACCI_N, FIBONACCI_EXPECT);
+fn test_rayon_scope() {
+    rayon_scope(COUNT, FIBONACCI_N, FIBONACCI_EXPECT);
+}
+
+#[test]
+fn test_rayon_par_iter_is_parallel() {
+    let cpus = num_cpus::get();
+    let fib_time = calibrate_fibonacci(FIBONACCI_N_PAR);
+    let time = Instant::now();
+    rayon_par_iter(cpus, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR);
+    assert!(time.elapsed() < fib_time * 2);
+}
+
+#[test]
+fn test_rayon_par_iter() {
+    rayon_par_iter(COUNT, FIBONACCI_N, FIBONACCI_EXPECT);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -66,11 +81,40 @@ async fn test_tokio_tasks_is_parallel() {
     let cpus = num_cpus::get();
     let fib_time = calibrate_fibonacci(FIBONACCI_N_PAR);
     let time = Instant::now();
-    rayon(cpus, FIBONACCI_N, FIBONACCI_EXPECT);
+    tokio_tasks(cpus, cpus * 10, 2, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR).await;
     assert!(time.elapsed() < fib_time * 2);
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tokio_tasks() {
-    tokio_tasks(num_cpus::get(), COUNT, FIBONACCI_N, FIBONACCI_EXPECT).await;
+    let cpus = num_cpus::get();
+    tokio_tasks(cpus, cpus * 8, COUNT, FIBONACCI_N, FIBONACCI_EXPECT).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_buffer_unordered_is_not_parallel() {
+    let cpus = num_cpus::get();
+    let fib_time = calibrate_fibonacci(FIBONACCI_N_PAR);
+    let time = Instant::now();
+    buffer_unordered(cpus, cpus, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR).await;
+    assert!(time.elapsed() > fib_time * 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_buffer_unordered() {
+    buffer_unordered(num_cpus::get(), COUNT, FIBONACCI_N, FIBONACCI_EXPECT).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_for_each_concurrent_is_not_parallel() {
+    let cpus = num_cpus::get();
+    let fib_time = calibrate_fibonacci(FIBONACCI_N_PAR);
+    let time = Instant::now();
+    for_each_concurrent(cpus, cpus, FIBONACCI_N_PAR, FIBONACCI_EXPECT_PAR).await;
+    assert!(time.elapsed() > fib_time * 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_for_each_concurrent() {
+    for_each_concurrent(num_cpus::get(), COUNT, FIBONACCI_N, FIBONACCI_EXPECT).await;
 }
